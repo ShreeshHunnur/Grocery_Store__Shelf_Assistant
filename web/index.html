@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retail Shelf Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <meta name="description" content="Voice-enabled retail assistant for product location and information queries">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛒 Retail Shelf Assistant</h1>
+            <p>Ask about product locations and information using your voice</p>
+        </header>
+
+        <main>
+            <!-- Permission Status -->
+            <div id="permission-status" class="status-card hidden">
+                <div class="status-icon">🔒</div>
+                <div class="status-text">
+                    <h3>Microphone Permission Required</h3>
+                    <p>Click the microphone button to grant permission for voice recording.</p>
+                </div>
+            </div>
+
+            <!-- Main Interface -->
+            <div id="main-interface" class="hidden">
+                <!-- Voice Controls -->
+                <div class="voice-controls">
+                    <button id="mic-button" class="mic-button" aria-label="Start/Stop Recording">
+                        <div class="mic-icon">🎤</div>
+                        <div class="mic-text">Tap to Speak</div>
+                    </button>
+                    
+                    <div class="recording-indicator hidden" id="recording-indicator">
+                        <div class="pulse"></div>
+                        <span>Recording...</span>
+                    </div>
+                </div>
+
+                <!-- Text Input Fallback -->
+                <div class="text-input-section">
+                    <label for="text-input">Or type your question:</label>
+                    <div class="input-group">
+                        <input type="text" id="text-input" placeholder="e.g., Where is the milk?">
+                        <button id="text-submit" class="submit-button">Ask</button>
+                    </div>
+                </div>
+
+                <!-- Response Area -->
+                <div id="response-area" class="response-area hidden">
+                    <div class="response-header">
+                        <h3>Response</h3>
+                        <div class="response-status" id="response-status"></div>
+                    </div>
+                    
+                    <div class="response-content">
+                        <div id="transcribed-text" class="transcribed-text"></div>
+                        <div id="response-text" class="response-text"></div>
+                    </div>
+
+                    <!-- Audio Controls -->
+                    <div class="audio-controls hidden" id="audio-controls">
+                        <button id="play-button" class="play-button">
+                            <span class="play-icon">▶️</span>
+                            <span class="play-text">Play Response</span>
+                        </button>
+                        <div class="audio-visualizer" id="audio-visualizer"></div>
+                    </div>
+                </div>
+
+                <!-- Error Messages -->
+                <div id="error-message" class="error-message hidden"></div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading-state" class="loading-state hidden">
+                <div class="spinner"></div>
+                <p>Processing your request...</p>
+            </div>
+        </main>
+
+        <footer>
+            <div class="help-section">
+                <h3>Try asking:</h3>
+                <div class="example-queries">
+                    <button class="example-button" data-query="Where is the milk?">Where is the milk?</button>
+                    <button class="example-button" data-query="Find apples">Find apples</button>
+                    <button class="example-button" data-query="What are the ingredients in bread?">What are the ingredients in bread?</button>
+                    <button class="example-button" data-query="Is this product gluten free?">Is this product gluten free?</button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

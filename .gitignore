@@ -1,0 +1,67 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# Environment variables
+.env
+.env.*
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Test and coverage
+.pytest_cache/
+.cache
+.coverage
+coverage.xml
+htmlcov/
+
+# Pydantic / mypy
+.mypy_cache/
+typings/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Database and data files generated at runtime
+data/*.db
+data/*.sqlite
+data/faiss_index.bin
+
+# Electron / Node
+electron/node_modules/
+electron/dist/
+electron/build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Compiled files
+*.pyc
+*.pyo
+*.pyd

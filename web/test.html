@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retail Shelf Assistant - Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .mic-button {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            border: none;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+        }
+        .mic-button:hover {
+            transform: scale(1.05);
+        }
+        .text-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .submit-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛒 Retail Shelf Assistant - Test</h1>
+        
+        <!-- Microphone Button -->
+        <button id="mic-button" class="mic-button">
+            🎤<br>Tap to Speak
+        </button>
+        
+        <!-- Text Input -->
+        <div>
+            <label>Or type your question:</label>
+            <input type="text" id="text-input" class="text-input" placeholder="e.g., Where is the milk?">
+            <button id="text-submit" class="submit-button">Ask</button>
+        </div>
+        
+        <!-- Response Area -->
+        <div id="response-area" class="response hidden">
+            <h3>Response:</h3>
+            <div id="response-text"></div>
+        </div>
+        
+        <!-- Status -->
+        <div id="status" style="margin-top: 20px; text-align: center; color: #666;">
+            Ready to help!
+        </div>
+    </div>
+
+    <script>
+        console.log('JavaScript loaded successfully');
+        
+        const micButton = document.getElementById('mic-button');
+        const textInput = document.getElementById('text-input');
+        const textSubmit = document.getElementById('text-submit');
+        const responseArea = document.getElementById('response-area');
+        const responseText = document.getElementById('response-text');
+        const status = document.getElementById('status');
+        
+        // Test if elements are found
+        console.log('Mic button found:', micButton);
+        console.log('Text input found:', textInput);
+        
+        // Mic button click handler
+        micButton.addEventListener('click', () => {
+            status.textContent = 'Microphone clicked! (Voice not implemented yet)';
+            console.log('Mic button clicked');
+        });
+        
+        // Text submit handler
+        textSubmit.addEventListener('click', () => {
+            const query = textInput.value.trim();
+            if (query) {
+                status.textContent = 'Processing text query...';
+                console.log('Text query:', query);
+                
+                // Simulate API call
+                setTimeout(() => {
+                    responseText.textContent = `You asked: "${query}"\n\nThis is a test response. The actual API integration will be added next.`;
+                    responseArea.classList.remove('hidden');
+                    status.textContent = 'Response received!';
+                }, 1000);
+            }
+        });
+        
+        // Enter key handler
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                textSubmit.click();
+            }
+        });
+        
+        console.log('Event listeners attached');
+    </script>
+</body>
+</html>

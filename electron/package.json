@@ -1,0 +1,15 @@
+{
+  "name": "retail-shelf-assistant-electron",
+  "version": "0.1.0",
+  "description": "Electron wrapper for the Retail Shelf Assistant (Windows)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^25.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}
