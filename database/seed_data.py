@@ -594,7 +594,7 @@ class ProductDataGenerator:
                 INSERT INTO product_popularity 
                 (product_id, search_count, last_searched, popularity_score)
                 VALUES (?, ?, ?, ?)
-            """, (product_id, search_count, last_searched, popularity_score))
+            """, (product_id, search_count, last_searched.isoformat(), popularity_score))
         
         conn.commit()
     
@@ -639,6 +639,45 @@ class ProductDataGenerator:
         try:
             print("+ Building embeddings and FAISS index (this may take a while)")
             import numpy as np
+            # Compatibility shim: some versions of huggingface_hub removed
+            # `cached_download` and provide `hf_hub_download` instead. The
+            # sentence-transformers package (or its dependencies) may try to
+            # import `cached_download` from huggingface_hub which raises
+            # ImportError on newer hub versions. Monkeypatch the huggingface_hub
+            # module to provide a `cached_download` alias when possible so the
+            # rest of the pipeline can work without forcing a particular
+            # huggingface_hub package version.
+            try:
+                import huggingface_hub as _hf_hub
+                # Provide a compatibility wrapper for cached_download so
+                # older callsites that pass url=... continue to work with
+                # newer huggingface_hub that exposes hf_hub_download.
+                if not hasattr(_hf_hub, 'cached_download') and hasattr(_hf_hub, 'hf_hub_download'):
+                    def _cached_download(url=None, *args, **kwargs):
+                        if url:
+                            try:
+                                import requests
+                                import tempfile
+                                import os
+                                resp = requests.get(url, stream=True, timeout=30)
+                                resp.raise_for_status()
+                                filename = os.path.basename(url.split('?')[0]) or ''
+                                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=filename)
+                                for chunk in resp.iter_content(8192):
+                                    if chunk:
+                                        tmp.write(chunk)
+                                tmp.close()
+                                return tmp.name
+                            except Exception:
+                                return _hf_hub.hf_hub_download(*args, **kwargs)
+                        return _hf_hub.hf_hub_download(*args, **kwargs)
+
+                    _hf_hub.cached_download = _cached_download
+            except Exception:
+                # If we can't import or patch huggingface_hub, let the
+                # downstream import raise and be caught by the outer except.
+                pass
+
             from sentence_transformers import SentenceTransformer
             import faiss
 
@@ -649,8 +688,8 @@ class ProductDataGenerator:
             cursor.execute("""
                 SELECT p.id as product_id, p.name as product_name, b.name as brand_name,
                        c.name as category_name, p.description,
-                       GROUP_CONCAT(DISTINCT ps.synonym, ' ') as synonyms,
-                       GROUP_CONCAT(DISTINCT pk.keyword, ' ') as keywords
+                       GROUP_CONCAT(DISTINCT ps.synonym) as synonyms,
+                       GROUP_CONCAT(DISTINCT pk.keyword) as keywords
                 FROM products p
                 JOIN brands b ON p.brand_id = b.id
                 JOIN categories c ON p.category_id = c.id

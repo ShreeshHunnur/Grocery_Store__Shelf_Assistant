@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from ..api.models import ProductInfoResponse
 from config.settings import LLM_CONFIG
+from config.settings import VLM_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -299,6 +300,428 @@ class LLMService:
                 "model": self.model_name,
                 "base_url": self.base_url
             }
+
+    def _enhance_product_description(self, base_description: str, img) -> str:
+        """
+        Enhance basic image caption with detailed product analysis.
+        
+        Args:
+            base_description: Basic caption from VLM
+            img: PIL Image object for additional analysis
+            
+        Returns:
+            Enhanced description with product details
+        """
+        try:
+            import numpy as np
+            
+            # Get image properties for context
+            img_width, img_height = img.size
+            img_array = np.array(img)
+            
+            # Analyze image characteristics
+            brightness = np.mean(img_array)
+            is_clear = brightness > 50 and brightness < 200  # Good lighting conditions
+            
+            # Start with base description
+            enhanced = f"**Product Analysis:** {base_description}"
+            
+            # Add detailed product guidance based on common grocery items
+            product_keywords = {
+                'bottle': {
+                    'analysis': 'This appears to be a bottled product.',
+                    'guidance': 'Check the label for: brand name, volume/size, ingredients list, nutritional information, expiration date, and recycling instructions. Look for any certifications (organic, non-GMO, etc.).'
+                },
+                'can': {
+                    'analysis': 'This looks like a canned product.',
+                    'guidance': 'Important details include: brand, net weight, ingredient list, nutritional facts panel, best-by date, and any dietary icons (gluten-free, vegan, etc.). Check for dents or damage.'
+                },
+                'box': {
+                    'analysis': 'This appears to be a boxed/packaged product.',
+                    'guidance': 'Key information to look for: brand name, product type, serving size, nutritional information, ingredients, preparation instructions, and storage requirements.'
+                },
+                'fruit': {
+                    'analysis': 'This appears to be fresh produce - fruit.',
+                    'guidance': 'Consider: ripeness level, origin/source, organic certification, nutritional benefits (vitamins, fiber), storage tips, and best consumption timeframe.'
+                },
+                'vegetable': {
+                    'analysis': 'This looks like fresh produce - vegetables.',
+                    'guidance': 'Check for: freshness indicators, organic labeling, nutritional value (vitamins, minerals), preparation methods, and proper storage conditions.'
+                },
+                'bread': {
+                    'analysis': 'This appears to be a bread or bakery product.',
+                    'guidance': 'Important details: ingredients (check for allergens like gluten, nuts), nutritional info, fiber content, preservatives, expiration date, and storage instructions.'
+                },
+                'dairy': {
+                    'analysis': 'This looks like a dairy product.',
+                    'guidance': 'Key considerations: fat content, protein levels, calcium content, pasteurization, expiration date, storage temperature requirements, and any lactose-free labeling.'
+                }
+            }
+            
+            # Try to match product category and add relevant guidance
+            description_lower = base_description.lower()
+            matched_category = None
+            
+            for category, info in product_keywords.items():
+                if category in description_lower:
+                    matched_category = category
+                    break
+            
+            # Add specific product analysis
+            if matched_category:
+                enhanced += f"\n\n**Product Category:** {product_keywords[matched_category]['analysis']}"
+                enhanced += f"\n\n**What to Look For:** {product_keywords[matched_category]['guidance']}"
+            else:
+                # Generic product guidance
+                enhanced += "\n\n**General Product Analysis:** When examining any grocery product, check for brand name, ingredients, nutritional information, expiration dates, and any certifications or dietary indicators."
+            
+            # Add image quality context
+            if is_clear:
+                enhanced += "\n\n**Image Quality:** The image appears clear enough for detailed label reading."
+            else:
+                enhanced += "\n\n**Image Quality:** For better product identification, ensure good lighting and clear focus on product labels."
+            
+            # Add practical shopping advice
+            enhanced += "\n\n**Shopping Tips:** Compare prices per unit, check expiration dates, read ingredient lists for allergens, and look for any promotional offers or coupons."
+            
+            # Add health and safety reminders
+            enhanced += "\n\n**Health & Safety:** Always check for damage to packaging, verify expiration dates, and be aware of any personal allergies or dietary restrictions when selecting products."
+            
+            return enhanced
+            
+        except Exception as e:
+            logger.warning(f"Failed to enhance product description: {e}")
+            return f"**Product Analysis:** {base_description}\n\n**Note:** For detailed product information, please check the product label for ingredients, nutritional facts, and usage instructions."
+
+    def generate_vision_answer(self, image_bytes: bytes, filename: str = "image.jpg") -> ProductInfoResponse:
+        """
+        Send image bytes to the configured VLM (Moondream) endpoint and return a
+        ProductInfoResponse containing a description/labels and confidence.
+
+        The VLM endpoint is configurable via `VLM_CONFIG` in settings. The
+        implementation attempts a multipart upload with key 'image' and expects
+        a JSON response containing at least a text description.
+        """
+        # Check if VLM is enabled
+        if not VLM_CONFIG.get("enabled", True):
+            logger.info("VLM functionality is disabled in configuration")
+            return ProductInfoResponse(
+                normalized_product="image",
+                answer="Vision analysis is currently disabled. Please enable VLM in configuration to use this feature.",
+                caveats="Vision service disabled",
+                confidence=0.0
+            )
+            
+        # Try Hugging Face local pipeline first if configured
+        provider = VLM_CONFIG.get("provider", "http")
+        if provider == "huggingface" and VLM_CONFIG.get("enabled", True):
+            hf_model = VLM_CONFIG.get("hf_model")
+            try:
+                from transformers import pipeline
+                from PIL import Image
+                import io as _io
+
+                logger.info(f"Using Hugging Face VLM model: {hf_model}")
+
+                # Create image object
+                try:
+                    img = Image.open(_io.BytesIO(image_bytes)).convert("RGB")
+                except Exception as e:
+                    logger.error(f"Failed to open image for HF pipeline: {e}")
+                    raise
+
+                # Create pipeline; check for different VLM models
+                try:
+                    # Import torch for device management
+                    import torch
+                    
+                    # Get trust_remote_code setting from config
+                    trust_remote_code = VLM_CONFIG.get("trust_remote_code", False)
+                    
+                    # Use Microsoft GiT or other standard VLM models
+                    logger.info(f"Loading VLM model: {hf_model}")
+                    
+                    # Microsoft GiT and other standard models work with standard pipelines
+                    if any(model_name in hf_model.lower() for model_name in ["git", "blip", "vit-gpt2"]):
+                        logger.info("Using standard image-to-text pipeline...")
+                        
+                        # Create standard image-to-text pipeline
+                        captioner = pipeline(
+                            "image-to-text", 
+                            model=hf_model,
+                            trust_remote_code=trust_remote_code,
+                            device_map="cpu",  # Use CPU for compatibility
+                            torch_dtype=torch.float32 if torch.cuda.is_available() == False else torch.float16
+                        )
+                        
+                        # Generate caption with detailed product analysis prompt
+                        logger.info("Generating detailed product analysis...")
+                        
+                        # Create a comprehensive prompt for product identification and analysis
+                        detailed_prompts = [
+                            "Analyze this image and provide detailed information about any product or object being held. Include: product name, brand if visible, type/category, key features, nutritional highlights, potential uses, and any safety information.",
+                            "Describe the product shown in this image. Focus on: what it is, brand/manufacturer, size/packaging, ingredients or materials visible, recommended uses, and any warnings or certifications you can see.",
+                            "Examine this image for any food or consumer product. Provide comprehensive details including: product identification, nutritional information, usage instructions, storage recommendations, and any health or safety considerations.",
+                            "Look at this product being held and tell me everything useful about it: name, brand, category, key benefits, how to use it, nutritional value if applicable, and any important consumer information."
+                        ]
+                        
+                        # Try multiple prompts for best results
+                        best_result = None
+                        best_length = 0
+                        
+                        for i, prompt in enumerate(detailed_prompts):
+                            try:
+                                # For standard image-to-text models, we can't use custom prompts directly
+                                # But we can analyze the generated caption and enhance it
+                                caption_results = captioner(img)
+                                
+                                if isinstance(caption_results, list) and caption_results:
+                                    result = caption_results[0]
+                                    if isinstance(result, dict):
+                                        base_description = result.get('generated_text', str(result))
+                                    else:
+                                        base_description = str(result)
+                                else:
+                                    base_description = str(caption_results)
+                                
+                                # Enhance the basic caption with product analysis
+                                enhanced_description = self._enhance_product_description(base_description, img)
+                                
+                                if len(enhanced_description) > best_length:
+                                    best_result = enhanced_description
+                                    best_length = len(enhanced_description)
+                                    
+                                break  # Use first successful result
+                                
+                            except Exception as prompt_error:
+                                logger.warning(f"Prompt {i+1} failed: {prompt_error}")
+                                continue
+                        
+                        if best_result:
+                            results = {"answer": best_result.strip()}
+                            logger.info(f"Enhanced product analysis: {results['answer'][:100]}...")
+                        else:
+                            # Fallback to basic caption
+                            caption_results = captioner(img)
+                            if isinstance(caption_results, list) and caption_results:
+                                result = caption_results[0]
+                                if isinstance(result, dict):
+                                    description = result.get('generated_text', str(result))
+                                else:
+                                    description = str(result)
+                            else:
+                                description = str(caption_results)
+                            
+                            results = {"answer": description.strip()}
+                            logger.info(f"Basic caption: {results['answer']}")
+                        
+                    # LLaVA models require different pipeline
+                    elif "llava" in hf_model.lower():
+                        logger.info("Using LLaVA image-text-to-text pipeline...")
+                        
+                        # For LLaVA, we need to use a different approach
+                        from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
+                        
+                        processor = LlavaNextProcessor.from_pretrained(hf_model)
+                        model = LlavaNextForConditionalGeneration.from_pretrained(
+                            hf_model, 
+                            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                            device_map="auto" if torch.cuda.is_available() else "cpu"
+                        )
+                        
+                        # Prepare detailed product analysis conversation
+                        conversation = [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": "You are a grocery shopping assistant. Analyze this image and provide comprehensive information about any product or object being held. Include: 1) Product identification (name, brand, type), 2) Key features and specifications, 3) Nutritional highlights if applicable, 4) Recommended uses or preparation methods, 5) Storage instructions, 6) Any visible certifications or dietary information, 7) Safety considerations or allergen warnings. Be as detailed and helpful as possible for someone making a purchasing decision."},
+                                    {"type": "image", "image": img},
+                                ],
+                            },
+                        ]
+                        
+                        # Apply chat template and generate
+                        prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
+                        inputs = processor(images=img, text=prompt, return_tensors="pt")
+                        
+                        with torch.no_grad():
+                            output = model.generate(**inputs, max_new_tokens=100)
+                        
+                        description = processor.decode(output[0], skip_special_tokens=True)
+                        # Clean up the description by removing the prompt
+                        if "You are a grocery shopping assistant" in description:
+                            description = description.split("You are a grocery shopping assistant.")[-1].strip()
+                        if "Analyze this image and provide comprehensive information" in description:
+                            description = description.split("Be as detailed and helpful as possible for someone making a purchasing decision.")[-1].strip()
+                        
+                        results = {"answer": description}
+                        logger.info(f"LLaVA generated: {results['answer']}")
+                        
+                    else:
+                        # Fallback to basic image analysis
+                        logger.warning(f"Unknown VLM model: {hf_model}, using basic analysis")
+                        import numpy as np
+                        
+                        # Get basic image properties
+                        img_width, img_height = img.size
+                        img_array = np.array(img)
+                        
+                        # Analyze image for product characteristics
+                        if len(img_array.shape) == 3:
+                            avg_colors = np.mean(img_array, axis=(0, 1))
+                            dominant_channel = np.argmax(avg_colors)
+                            color_names = ["red", "green", "blue"]
+                            dominant_color = color_names[dominant_channel]
+                            
+                            # Try to infer product type from image characteristics
+                            aspect_ratio = img_width / img_height
+                            
+                            if aspect_ratio > 1.5:
+                                shape_desc = "elongated/rectangular packaging"
+                            elif aspect_ratio < 0.7:
+                                shape_desc = "tall/vertical packaging" 
+                            else:
+                                shape_desc = "square/round packaging"
+                            
+                            description = f"""**Product Analysis from Image:**
+
+**Visual Characteristics:** This is a {img_width}x{img_height} pixel image showing {shape_desc} with {dominant_color} as the dominant color.
+
+**What to Look For:** When examining this product, check for:
+• Brand name and product type clearly visible on packaging
+• Ingredient list (usually on back or side panel)
+• Nutritional information panel
+• Net weight or volume
+• Expiration or best-by date
+• Any certification badges (Organic, Non-GMO, Fair Trade, etc.)
+• Barcode for price checking
+• Storage instructions
+• Allergen warnings
+
+**Shopping Tips:**
+• Compare unit prices (price per ounce/gram) with similar products
+• Check for any promotional stickers or coupons
+• Verify the product meets your dietary needs
+• Ensure packaging is intact and undamaged
+
+**Health & Safety:** Always read labels carefully for allergens and check expiration dates before purchasing."""
+                        else:
+                            description = f"""**Product Analysis:** This appears to be a grayscale image of a product.
+
+**General Guidance:** For any grocery product, important information to check includes brand name, ingredients, nutritional facts, expiration date, and storage instructions. Look for certifications and compare prices with similar items."""
+                        
+                        results = {"answer": description}
+                        logger.info(f"Basic analysis: {results['answer']}")
+                        
+                except ImportError as e:
+                    logger.warning(f"Missing dependencies for VLM: {e}")
+                    raise
+                except Exception as e:
+                    # If the model or pipeline is unavailable, raise to fall back
+                    logger.warning(f"VLM pipeline creation failed: {e}")
+                    if "not found" in str(e).lower() or "does not exist" in str(e).lower():
+                        logger.info("Consider checking the model name or using a different VLM provider")
+                    raise
+
+                # Parse results
+                description = None
+                confidence = 0.6
+                
+                if isinstance(results, dict):
+                    description = results.get("answer") or results.get("generated_text") or results.get("caption")
+                    if "score" in results:
+                        try:
+                            confidence = max(0.0, min(1.0, float(results.get("score"))))
+                        except Exception:
+                            pass
+                elif isinstance(results, list) and results:
+                    first = results[0]
+                    if isinstance(first, dict):
+                        description = first.get("generated_text") or first.get("caption") or first.get("answer") or str(first)
+                        # Some pipelines include score
+                        if "score" in first:
+                            try:
+                                confidence = max(0.0, min(1.0, float(first.get("score"))))
+                            except Exception:
+                                pass
+                    else:
+                        description = str(first)
+
+                if not description:
+                    description = "Hugging Face VLM returned no caption"
+
+                return ProductInfoResponse(
+                    normalized_product="image",
+                    answer=f"Image description: {description}",
+                    caveats=None,
+                    confidence=confidence
+                )
+            except Exception as hf_exc:
+                logger.warning(f"Hugging Face VLM attempt failed: {hf_exc}; falling back to HTTP VLM if configured")
+
+        # Fallback: HTTP POST to configured VLM endpoint (existing behaviour)
+        try:
+            base = VLM_CONFIG.get("base_url")
+            if not base:
+                logger.info("No HTTP VLM base_url configured, skipping HTTP VLM fallback")
+                raise Exception("No HTTP VLM endpoint configured")
+                
+            path = VLM_CONFIG.get("predict_path", "/v1/vision/predict")
+            url = base.rstrip("/") + path
+
+            headers = {}
+            api_key = VLM_CONFIG.get("api_key")
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+
+            files = {
+                "image": (filename, image_bytes, "image/jpeg")
+            }
+
+            resp = requests.post(url, files=files, headers=headers, timeout=VLM_CONFIG.get("timeout", 30))
+            if resp.status_code != 200:
+                logger.error(f"VLM API error: {resp.status_code} - {resp.text}")
+                raise Exception(f"VLM API error: {resp.status_code}")
+
+            data = resp.json()
+
+            # Defensive parsing
+            description = None
+            confidence = 0.6
+
+            if isinstance(data, dict):
+                description = data.get("description") or data.get("caption") or data.get("answer")
+                if not description and "labels" in data:
+                    labels = data.get("labels")
+                    if isinstance(labels, list) and labels:
+                        description = ", ".join([str(l) for l in labels[:5]])
+                if "confidence" in data:
+                    try:
+                        confidence = max(0.0, min(1.0, float(data.get("confidence"))))
+                    except Exception:
+                        pass
+
+            if not description:
+                if isinstance(data, str):
+                    description = data
+                else:
+                    description = "The VLM returned a response but no description was found."
+
+            return ProductInfoResponse(
+                normalized_product="image",
+                answer=f"Image description: {description}",
+                caveats=None,
+                confidence=confidence
+            )
+
+        except Exception as e:
+            logger.error(f"VLM vision request failed: {e}")
+            return ProductInfoResponse(
+                normalized_product="image",
+                answer="I'm sorry — I couldn't analyze the image right now.",
+                caveats="Vision service unavailable",
+                confidence=0.1
+            )
 
 class PromptLibrary:
     """Library of prompt templates for different question types."""

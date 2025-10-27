@@ -38,6 +38,19 @@ LLM_CONFIG = {
     "timeout": 60
 }
 
+# Vision / VLM settings (Microsoft GiT configuration)
+VLM_CONFIG = {
+    "enabled": True,
+    "provider": "huggingface",
+    "hf_model": "microsoft/git-base-coco",
+    "trust_remote_code": False,  # GiT doesn't require trust_remote_code
+    "timeout": 30,
+    # HTTP fallback settings (disabled when using HuggingFace)
+    "base_url": None,
+    "api_key": None,
+    "predict_path": "/v1/vision/predict"
+}
+
 # Classification settings
 CLASSIFICATION_CONFIG = {
     "location_keywords": [

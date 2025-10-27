@@ -32,6 +32,15 @@ class VoiceAssistant {
             loadingState: document.getElementById('loading-state'),
             exampleButtons: document.querySelectorAll('.example-button')
         };
+
+        // Vision / camera elements (added dynamically in HTML)
+        this.elements.cameraToggle = document.getElementById('camera-toggle');
+        this.elements.captureButton = document.getElementById('capture-button');
+        this.elements.closeCamera = document.getElementById('close-camera');
+        this.elements.cameraArea = document.getElementById('camera-area');
+        this.elements.cameraVideo = document.getElementById('camera-video');
+        this.elements.captureCanvas = document.getElementById('capture-canvas');
+        this.elements.visionPreview = document.getElementById('vision-preview');
         
         this.init();
     }
@@ -83,6 +92,17 @@ class VoiceAssistant {
                 this.handleTextQuery();
             });
         });
+
+        // Camera controls
+        if (this.elements.cameraToggle) {
+            this.elements.cameraToggle.addEventListener('click', () => this.openCamera());
+        }
+        if (this.elements.captureButton) {
+            this.elements.captureButton.addEventListener('click', () => this.captureImage());
+        }
+        if (this.elements.closeCamera) {
+            this.elements.closeCamera.addEventListener('click', () => this.closeCamera());
+        }
         
         // Audio context resume on user interaction
         document.addEventListener('click', () => {
@@ -314,6 +334,99 @@ class VoiceAssistant {
         } catch (error) {
             console.error('Error processing text query:', error);
             this.showError('Failed to process query: ' + error.message);
+        } finally {
+            this.hideLoadingState();
+        }
+    }
+
+    async openCamera() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                this.showError('Camera not supported in this browser.');
+                return;
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+            this.cameraStream = stream;
+            this.elements.cameraVideo.srcObject = stream;
+            this.elements.cameraArea.classList.remove('hidden');
+            this.elements.captureButton.classList.remove('hidden');
+            this.elements.closeCamera.classList.remove('hidden');
+            this.elements.cameraToggle.classList.add('hidden');
+        } catch (err) {
+            console.error('Error opening camera', err);
+            this.showError('Unable to access camera: ' + err.message);
+        }
+    }
+
+    closeCamera() {
+        try {
+            if (this.cameraStream) {
+                this.cameraStream.getTracks().forEach(t => t.stop());
+                this.cameraStream = null;
+            }
+            this.elements.cameraArea.classList.add('hidden');
+            this.elements.captureButton.classList.add('hidden');
+            this.elements.closeCamera.classList.add('hidden');
+            this.elements.cameraToggle.classList.remove('hidden');
+        } catch (err) {
+            console.error('Error closing camera', err);
+        }
+    }
+
+    async captureImage() {
+        try {
+            const video = this.elements.cameraVideo;
+            const canvas = this.elements.captureCanvas;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert to blob (jpeg)
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    this.showError('Failed to capture image');
+                    return;
+                }
+
+                // Show preview
+                const url = URL.createObjectURL(blob);
+                this.elements.visionPreview.innerHTML = `<img src="${url}" alt="capture" width="320" />`;
+
+                // Upload to server
+                await this.uploadImage(blob);
+            }, 'image/jpeg', 0.9);
+
+        } catch (err) {
+            console.error('Error capturing image', err);
+            this.showError('Error capturing image: ' + err.message);
+        }
+    }
+
+    async uploadImage(imageBlob) {
+        try {
+            this.showLoadingState();
+
+            const formData = new FormData();
+            formData.append('image_file', imageBlob, 'capture.jpg');
+            formData.append('session_id', this.sessionId);
+
+            const response = await fetch('/api/v1/vision', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.detail?.error || 'Vision API error');
+            }
+
+            const data = await response.json();
+            // Wrap in display structure similar to text responses
+            this.displayResponse({ transcribed_text: 'Image captured', response: data });
+
+        } catch (err) {
+            console.error('Error uploading image', err);
+            this.showError('Image upload failed: ' + err.message);
         } finally {
             this.hideLoadingState();
         }

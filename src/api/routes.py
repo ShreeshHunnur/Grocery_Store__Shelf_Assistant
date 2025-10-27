@@ -23,6 +23,7 @@ from .orchestrator import BackendOrchestrator
 # from src.services.audio_io import AudioIOService
 # Keep only this import
 from src.services.google_audio_io import GoogleAudioIOService
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -279,3 +280,51 @@ async def process_voice_query(
                 details={"message": str(e)}
             ).dict()
         )
+
+
+@router.post("/vision", response_model=dict)
+async def process_vision_image(image_file: UploadFile = File(...), session_id: Optional[str] = Form(None)):
+    """
+    Process an uploaded image using the configured vision model (Moondream VLM).
+
+    Returns a ProductInfoResponse-like dict with an image description and confidence.
+    """
+    try:
+        logger.info(f"Processing vision image: {image_file.filename}")
+
+        # Basic validation
+        if not image_file.content_type or not image_file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail=ErrorResponse(
+                error="Invalid file type",
+                error_code="INVALID_FILE_TYPE",
+                details={"accepted_types": ["image/jpeg", "image/png", "image/webp"]}
+            ).dict())
+
+        image_bytes = await image_file.read()
+
+        # Call LLMService vision method via orchestrator
+        from .main import orchestrator
+
+        # The orchestrator exposes llm_service; call the vision method
+        try:
+            vision_response = orchestrator.llm_service.generate_vision_answer(image_bytes, filename=image_file.filename)
+        except Exception as e:
+            logger.error(f"Vision service call failed: {e}")
+            raise HTTPException(status_code=500, detail=ErrorResponse(
+                error="Vision service failed",
+                error_code="VLM_ERROR",
+                details={"message": str(e)}
+            ).dict())
+
+        # vision_response is a ProductInfoResponse
+        return vision_response.dict()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing vision image: {e}")
+        raise HTTPException(status_code=500, detail=ErrorResponse(
+            error="Failed to process image",
+            error_code="VISION_PROCESSING_ERROR",
+            details={"message": str(e)}
+        ).dict())

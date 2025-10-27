@@ -8,11 +8,11 @@ let serverProcess = null;
 
 const PYTHON_SCRIPT = path.join(__dirname, '..', 'scripts', 'start_server.py');
 const SERVER_HOST = '127.0.0.1';
-const SERVER_PORT = 8000;
+const SERVER_PORT = 8001;
 const SERVER_URL = `http://${SERVER_HOST}:${SERVER_PORT}`;
 const HEALTH_PATH = '/health';
 
-function waitForServer(timeoutMs = 30000) {
+function waitForServer(timeoutMs = 60000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const check = () => {
@@ -47,10 +47,26 @@ function waitForServer(timeoutMs = 30000) {
 function startPythonServer() {
   // Spawn python process to run the FastAPI server script
   // Use 'python' from PATH; users can configure their environment if needed
+  // If a server is already running at SERVER_URL, skip spawning a new Python process
+  const checkExisting = () => new Promise((resolve) => {
+    const req = http.get(`${SERVER_URL}${HEALTH_PATH}`, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(1500, () => { req.abort(); resolve(false); });
+  });
+
+  checkExisting().then((exists) => {
+    if (exists) {
+      console.log('Detected existing backend server; skipping spawn.');
+      serverProcess = null;
+      return;
+    }
+
   const pythonExe = process.env.PYTHON_EXECUTABLE || 'python';
   serverProcess = spawn(pythonExe, [PYTHON_SCRIPT], {
     cwd: path.join(__dirname, '..'),
-    env: process.env,
+    env: Object.assign({}, process.env, { ELECTRON_APP: '1' }),
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
@@ -68,6 +84,9 @@ function startPythonServer() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       dialog.showErrorBox('Backend stopped', 'The embedded Python server has stopped. The app may not function correctly.');
     }
+  });
+  }).catch((err) => {
+    console.error('Error checking existing server:', err);
   });
 }
 

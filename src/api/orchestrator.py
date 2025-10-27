@@ -46,6 +46,47 @@ class BackendOrchestrator:
 
         try:
             # Lazy import to avoid hard dependency if not available
+            # Compatibility: some versions of huggingface_hub removed
+            # `cached_download` in favor of `hf_hub_download`. Patch the
+            # module if present so downstream imports (sentence-transformers
+            # or its dependencies) that expect cached_download continue to work.
+            try:
+                import huggingface_hub as _hf_hub
+                # If hf_hub_download exists but cached_download does not,
+                # provide a compatibility wrapper that accepts the older
+                # `cached_download(url=...)` call pattern used in some
+                # downstream packages. If a URL is supplied, download it
+                # via requests to a temporary file; otherwise forward to
+                # hf_hub_download.
+                if not hasattr(_hf_hub, 'cached_download') and hasattr(_hf_hub, 'hf_hub_download'):
+                    def _cached_download(url=None, *args, **kwargs):
+                        # Direct URL download path (older callers pass url=...)
+                        if url:
+                            try:
+                                import requests
+                                import tempfile
+                                import os
+                                resp = requests.get(url, stream=True, timeout=30)
+                                resp.raise_for_status()
+                                filename = os.path.basename(url.split('?')[0]) or ''
+                                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=filename)
+                                for chunk in resp.iter_content(8192):
+                                    if chunk:
+                                        tmp.write(chunk)
+                                tmp.close()
+                                return tmp.name
+                            except Exception:
+                                # If direct download fails, attempt to call
+                                # hf_hub_download as a fallback.
+                                return _hf_hub.hf_hub_download(*args, **kwargs)
+                        # Otherwise forward to hf_hub_download
+                        return _hf_hub.hf_hub_download(*args, **kwargs)
+
+                    _hf_hub.cached_download = _cached_download
+            except Exception:
+                # Ignore patch errors; we'll catch failures on import below
+                pass
+
             from sentence_transformers import SentenceTransformer
             import faiss
 
@@ -75,8 +116,11 @@ class BackendOrchestrator:
                     logger.warning(f"Failed to load FAISS index: {e}")
             else:
                 logger.info("No FAISS index found; vector search disabled")
-        except Exception:
-            logger.info("FAISS or sentence-transformers not installed; vector search disabled")
+        except Exception as e:
+            # Log the exception so the real cause (missing packages, import
+            # errors, or model download failures) is visible in logs. Keep
+            # behavior backward-compatible by disabling vector search.
+            logger.info(f"FAISS or sentence-transformers not installed; vector search disabled: {e}")
         
     def _get_trace_id(self) -> str:
         """Generate unique trace ID for request tracking."""
