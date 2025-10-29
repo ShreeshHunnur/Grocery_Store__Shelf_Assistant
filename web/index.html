@@ -3,112 +3,418 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retail Shelf Assistant</title>
-    <link rel="stylesheet" href="/static/styles.css">
-    <meta name="description" content="Voice-enabled retail assistant for product location and information queries">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://127.0.0.1:8001 https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob:;">
+    <title>ShelfSense AI - Smart Grocery Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css" type="text/css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="description" content="AI-powered grocery assistant for instant product discovery and information">
+    <meta name="theme-color" content="#6366F1">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🛒 Retail Shelf Assistant</h1>
-            <p>Ask about product locations and information using your voice</p>
-        </header>
-
-        <main>
-            <!-- Permission Status -->
-            <div id="permission-status" class="status-card hidden">
-                <div class="status-icon">🔒</div>
-                <div class="status-text">
-                    <h3>Microphone Permission Required</h3>
-                    <p>Click the microphone button to grant permission for voice recording.</p>
+    <div class="app-container">
+        <!-- Navigation Header -->
+        <nav class="top-nav">
+            <div class="nav-brand">
+                <div class="brand-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>ShelfSense AI</h1>
+                    <span>Smart Grocery Assistant</span>
                 </div>
             </div>
+            <div class="nav-actions">
+                <button class="nav-btn" id="theme-toggle" title="Toggle theme">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="nav-btn" id="settings-btn" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </nav>
 
-            <!-- Main Interface -->
-            <div id="main-interface" class="hidden">
-                <!-- Voice Controls -->
-                <div class="voice-controls">
-                    <button id="mic-button" class="mic-button" aria-label="Start/Stop Recording">
-                        <div class="mic-icon">🎤</div>
-                        <div class="mic-text">Tap to Speak</div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Hero Section -->
+            <section class="hero-section">
+                <div class="hero-content">
+                    <h2 class="hero-title">Find anything in seconds</h2>
+                    <p class="hero-subtitle">Ask about products, get locations, learn ingredients - your AI shopping companion</p>
+                </div>
+                
+                <!-- Status Indicators -->
+                <div class="status-bar">
+                    <div class="status-item" id="ai-status">
+                        <i class="fas fa-brain"></i>
+                        <span>AI Ready</span>
+                    </div>
+                    <div class="status-item" id="voice-status">
+                        <i class="fas fa-microphone"></i>
+                        <span>Voice Ready</span>
+                    </div>
+                    <div class="status-item" id="camera-status">
+                        <i class="fas fa-camera"></i>
+                        <span>Vision Ready</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Controls -->
+            <section class="interaction-panel">
+                <!-- Voice Interface -->
+                <div class="control-card voice-card">
+                    <div class="card-header">
+                        <div class="card-icon voice-icon">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <div class="card-title">
+                            <h3>Voice Assistant</h3>
+                            <p>Speak naturally to find products</p>
+                        </div>
+                    </div>
+                    
+                    <div class="voice-interface">
+                        <button id="mic-button" class="primary-voice-btn" aria-label="Start/Stop Recording">
+                            <div class="voice-btn-content">
+                                <div class="mic-icon-large">
+                                    <i class="fas fa-microphone"></i>
+                                </div>
+                                <span class="voice-btn-text">Tap to Speak</span>
+                            </div>
+                            <div class="voice-waves">
+                                <div class="wave"></div>
+                                <div class="wave"></div>
+                                <div class="wave"></div>
+                            </div>
+                        </button>
+                        
+                        <div class="recording-status hidden" id="recording-indicator">
+                            <div class="pulse-dot"></div>
+                            <span>Listening...</span>
+                            <div class="sound-bars">
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                                <div class="bar"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Text Interface -->
+                <div class="control-card text-card">
+                    <div class="card-header">
+                        <div class="card-icon text-icon">
+                            <i class="fas fa-keyboard"></i>
+                        </div>
+                        <div class="card-title">
+                            <h3>Text Search</h3>
+                            <p>Type your question or product name</p>
+                        </div>
+                    </div>
+                    
+                    <div class="text-interface">
+                        <div class="search-input-group">
+                            <div class="input-wrapper">
+                                <i class="fas fa-search input-icon"></i>
+                                <input type="text" id="text-input" placeholder="e.g., Where is organic milk?" autocomplete="off">
+                                <button id="clear-input" class="clear-btn" title="Clear">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <button id="text-submit" class="search-btn">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vision Interface -->
+                <div class="control-card vision-card">
+                    <div class="card-header">
+                        <div class="card-icon vision-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <div class="card-title">
+                            <h3>Product Scanner</h3>
+                            <p>Show products to your camera</p>
+                        </div>
+                    </div>
+                    
+                    <div class="vision-interface">
+                        <div class="camera-controls">
+                            <button id="camera-toggle" class="camera-btn">
+                                <i class="fas fa-camera"></i>
+                                <span>Open Camera</span>
+                            </button>
+                            <button id="capture-button" class="capture-btn hidden">
+                                <i class="fas fa-camera-retro"></i>
+                                <span>Capture</span>
+                            </button>
+                            <button id="close-camera" class="close-btn hidden">
+                                <i class="fas fa-times"></i>
+                                <span>Close</span>
+                            </button>
+                        </div>
+                        
+                        <div class="camera-viewport hidden" id="camera-area">
+                            <div class="camera-container">
+                                <video id="camera-video" autoplay playsinline></video>
+                                <div class="camera-overlay">
+                                    <div class="scan-frame"></div>
+                                    <p class="scan-instruction">Point camera at product</p>
+                                </div>
+                            </div>
+                            <canvas id="capture-canvas" class="hidden"></canvas>
+                            <div id="vision-preview" class="vision-preview"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Results Display -->
+            <section class="results-section hidden" id="results-section">
+                <div class="results-card">
+                    <div class="results-header">
+                        <div class="results-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="results-title">
+                            <h3>Assistant Response</h3>
+                            <div class="confidence-badge" id="confidence-badge">
+                                <i class="fas fa-star"></i>
+                                <span id="confidence-score">95%</span>
+                            </div>
+                        </div>
+                        <button class="close-results" id="close-results" title="Close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Query Display -->
+                    <div class="query-display" id="query-display">
+                        <div class="query-label">
+                            <i class="fas fa-quote-left"></i>
+                            <span>You asked:</span>
+                        </div>
+                        <div class="query-text" id="transcribed-text"></div>
+                    </div>
+                    
+                    <!-- Response Content -->
+                    <div class="response-content">
+                        <div class="response-text" id="response-text"></div>
+                        
+                        <!-- Location Results -->
+                        <div class="location-results hidden" id="location-results">
+                            <div class="location-grid" id="location-grid"></div>
+                        </div>
+                        
+                        <!-- Product Info -->
+                        <div class="product-info hidden" id="product-info">
+                            <div class="info-sections" id="info-sections"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Audio Player -->
+                    <div class="audio-player hidden" id="audio-player">
+                        <div class="player-controls">
+                            <button id="play-button" class="play-btn">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <div class="audio-progress">
+                                <div class="progress-bar" id="progress-bar"></div>
+                            </div>
+                            <span class="audio-duration">0:00</span>
+                        </div>
+                        <div class="audio-visualizer" id="audio-visualizer">
+                            <div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div>
+                            <div class="visualizer-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="quick-actions-section">
+                <div class="quick-actions-header">
+                    <h3>Popular Searches</h3>
+                    <p>Try these common questions</p>
+                </div>
+                
+                <div class="quick-actions-grid">
+                    <button class="quick-action-btn" data-query="Where is milk?" data-category="location">
+                        <div class="action-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="action-content">
+                            <span class="action-title">Find Milk</span>
+                            <span class="action-subtitle">Dairy section</span>
+                        </div>
                     </button>
                     
-                    <div class="recording-indicator hidden" id="recording-indicator">
-                        <div class="pulse"></div>
-                        <span>Recording...</span>
-                    </div>
-                </div>
-
-                <!-- Text Input Fallback -->
-                <div class="text-input-section">
-                    <label for="text-input">Or type your question:</label>
-                    <div class="input-group">
-                        <input type="text" id="text-input" placeholder="e.g., Where is the milk?">
-                        <button id="text-submit" class="submit-button">Ask</button>
-                    </div>
-                </div>
-
-                <!-- Camera / Vision Section -->
-                <div class="vision-section">
-                    <h3>Show product with your camera</h3>
-                    <div class="camera-controls">
-                        <button id="camera-toggle" class="camera-button">Open Camera</button>
-                        <button id="capture-button" class="capture-button hidden">Capture</button>
-                        <button id="close-camera" class="camera-button hidden">Close Camera</button>
-                    </div>
-                    <div class="camera-area hidden" id="camera-area">
-                        <video id="camera-video" autoplay playsinline width="320" height="240"></video>
-                        <canvas id="capture-canvas" width="320" height="240" class="hidden"></canvas>
-                        <div id="vision-preview" class="vision-preview"></div>
-                    </div>
-                </div>
-
-                <!-- Response Area -->
-                <div id="response-area" class="response-area hidden">
-                    <div class="response-header">
-                        <h3>Response</h3>
-                        <div class="response-status" id="response-status"></div>
-                    </div>
+                    <button class="quick-action-btn" data-query="What are the ingredients in bread?" data-category="info">
+                        <div class="action-icon">
+                            <i class="fas fa-list-ul"></i>
+                        </div>
+                        <div class="action-content">
+                            <span class="action-title">Bread Ingredients</span>
+                            <span class="action-subtitle">Nutrition info</span>
+                        </div>
+                    </button>
                     
-                    <div class="response-content">
-                        <div id="transcribed-text" class="transcribed-text"></div>
-                        <div id="response-text" class="response-text"></div>
-                    </div>
+                    <button class="quick-action-btn" data-query="Find organic apples" data-category="location">
+                        <div class="action-icon">
+                            <i class="fas fa-apple-alt"></i>
+                        </div>
+                        <div class="action-content">
+                            <span class="action-title">Organic Apples</span>
+                            <span class="action-subtitle">Produce section</span>
+                        </div>
+                    </button>
+                    
+                    <button class="quick-action-btn" data-query="Is this product gluten free?" data-category="info">
+                        <div class="action-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="action-content">
+                            <span class="action-title">Gluten Free</span>
+                            <span class="action-subtitle">Dietary info</span>
+                        </div>
+                    </button>
+                    
+                    <button class="quick-action-btn" data-query="Where are frozen vegetables?" data-category="location">
+                        <div class="action-icon">
+                            <i class="fas fa-snowflake"></i>
+                        </div>
+                        <div class="action-content">
+                            <span class="action-title">Frozen Veggies</span>
+                            <span class="action-subtitle">Frozen foods</span>
+                        </div>
+                    </button>
+                    
+                    <button class="quick-action-btn" data-query="What's the price of pasta?" data-category="info">
+                        <div class="action-icon">
+                            <i class="fas fa-tag"></i>
+                        </div>
+                        <div class="action-content">
+                            <span class="action-title">Pasta Prices</span>
+                            <span class="action-subtitle">Cost info</span>
+                        </div>
+                    </button>
+                </div>
+            </section>
 
-                    <!-- Audio Controls -->
-                    <div class="audio-controls hidden" id="audio-controls">
-                        <button id="play-button" class="play-button">
-                            <span class="play-icon">▶️</span>
-                            <span class="play-text">Play Response</span>
-                        </button>
-                        <div class="audio-visualizer" id="audio-visualizer"></div>
+            <!-- Loading Overlay -->
+            <div id="loading-overlay" class="loading-overlay hidden">
+                <div class="loading-content">
+                    <div class="loading-spinner">
+                        <div class="spinner-ring"></div>
+                        <div class="spinner-ring"></div>
+                        <div class="spinner-ring"></div>
+                    </div>
+                    <h3 id="loading-title">Processing...</h3>
+                    <p id="loading-subtitle">Your AI assistant is thinking</p>
+                    <div class="loading-progress">
+                        <div class="progress-fill" id="progress-fill"></div>
                     </div>
                 </div>
-
-                <!-- Error Messages -->
-                <div id="error-message" class="error-message hidden"></div>
             </div>
 
-            <!-- Loading State -->
-            <div id="loading-state" class="loading-state hidden">
-                <div class="spinner"></div>
-                <p>Processing your request...</p>
+            <!-- Error Toast -->
+            <div id="error-toast" class="error-toast hidden">
+                <div class="toast-content">
+                    <div class="toast-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="toast-message">
+                        <h4>Something went wrong</h4>
+                        <p id="error-message"></p>
+                    </div>
+                    <button class="toast-close" id="close-error">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Permission Modal -->
+            <div id="permission-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Enable Voice & Camera</h3>
+                    </div>
+                    <div class="modal-body">
+                        <div class="permission-item">
+                            <div class="permission-icon">
+                                <i class="fas fa-microphone"></i>
+                            </div>
+                            <div class="permission-text">
+                                <h4>Microphone Access</h4>
+                                <p>Speak naturally to search for products</p>
+                            </div>
+                            <button class="permission-btn" id="enable-microphone">Enable</button>
+                        </div>
+                        <div class="permission-item">
+                            <div class="permission-icon">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                            <div class="permission-text">
+                                <h4>Camera Access</h4>
+                                <p>Scan products for instant information</p>
+                            </div>
+                            <button class="permission-btn" id="enable-camera">Enable</button>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-close" id="close-modal">Maybe Later</button>
+                    </div>
+                </div>
             </div>
         </main>
 
-        <footer>
-            <div class="help-section">
-                <h3>Try asking:</h3>
-                <div class="example-queries">
-                    <button class="example-button" data-query="Where is the milk?">Where is the milk?</button>
-                    <button class="example-button" data-query="Find apples">Find apples</button>
-                    <button class="example-button" data-query="What are the ingredients in bread?">What are the ingredients in bread?</button>
-                    <button class="example-button" data-query="Is this product gluten free?">Is this product gluten free?</button>
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>ShelfSense AI</h4>
+                    <p>Your intelligent grocery companion</p>
                 </div>
+                <div class="footer-section">
+                    <h4>Features</h4>
+                    <ul>
+                        <li>Voice Search</li>
+                        <li>Product Scanner</li>
+                        <li>Smart Navigation</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <ul>
+                        <li>Help Center</li>
+                        <li>Privacy Policy</li>
+                        <li>Terms of Service</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 ShelfSense AI. Powered by advanced AI technology.</p>
             </div>
         </footer>
     </div>
 
+    <!-- Hidden Elements -->
+    <div id="permission-status" class="hidden"></div>
+    <div id="main-interface" class="hidden"></div>
+    <div id="response-area" class="hidden"></div>
+    <div id="response-status" class="hidden"></div>
+    <div id="audio-controls" class="hidden"></div>
+    <div id="loading-state" class="hidden"></div>
+    
     <script src="/static/app.js"></script>
 </body>
 </html>

@@ -107,14 +107,23 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      webSecurity: false  // Disable web security for development
     }
   });
+
+  // Enable developer tools for debugging
+  mainWindow.webContents.openDevTools();
 
   // Load the UI endpoint on the local server
   const uiUrl = `${SERVER_URL}/ui`;
   mainWindow.loadURL(uiUrl).catch((err) => {
     console.error('Failed to load UI URL:', err);
+  });
+
+  // Log console messages from the renderer
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer Console] ${message}`);
   });
 
   mainWindow.on('closed', () => {

@@ -45,6 +45,8 @@ app.add_middleware(
 # Mount static files for web UI
 web_dir = BASE_DIR / "web"
 web_dir.mkdir(exist_ok=True)
+print(f"Mounting static files from: {web_dir}")
+print(f"Static files exist: {list(web_dir.glob('*'))}")
 app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
 
 # Include API routes
@@ -105,6 +107,49 @@ async def web_ui():
         return FileResponse(web_file)
     else:
         return {"message": "Web UI not found. Please ensure index.html exists in the web directory."}
+
+# Serve CSS directly to avoid StaticFiles issues in Electron
+@app.get("/static/styles.css")
+async def serve_css():
+    """Serve the CSS file directly."""
+    from fastapi.responses import Response
+    css_file = BASE_DIR / "web" / "styles.css"
+    if css_file.exists():
+        with open(css_file, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+        return Response(content=css_content, media_type="text/css")
+    else:
+        return Response("/* CSS file not found */", media_type="text/css", status_code=404)
+
+# Serve JS directly to avoid StaticFiles issues in Electron
+@app.get("/static/app.js")
+async def serve_js():
+    """Serve the JavaScript file directly."""
+    from fastapi.responses import Response
+    js_file = BASE_DIR / "web" / "app.js"
+    if js_file.exists():
+        with open(js_file, 'r', encoding='utf-8') as f:
+            js_content = f.read()
+        return Response(content=js_content, media_type="application/javascript")
+    else:
+        return Response("// JS file not found", media_type="application/javascript", status_code=404)
+
+# Debug endpoint to test static file serving
+@app.get("/debug/static")
+async def debug_static():
+    """Debug static file configuration."""
+    web_dir = BASE_DIR / "web"
+    files = list(web_dir.glob("*")) if web_dir.exists() else []
+    css_file = web_dir / "styles.css"
+    css_size = css_file.stat().st_size if css_file.exists() else 0
+    return {
+        "web_dir": str(web_dir),
+        "web_dir_exists": web_dir.exists(),
+        "files": [f.name for f in files],
+        "styles_css_exists": css_file.exists(),
+        "styles_css_size": css_size,
+        "app_js_exists": (web_dir / "app.js").exists()
+    }
 
 if __name__ == "__main__":
     config = get_config()

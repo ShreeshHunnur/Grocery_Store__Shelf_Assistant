@@ -255,6 +255,41 @@ class LLMService:
             confidence=0.1
         )
     
+    def _enrich_with_llm(self, base_description: str) -> Optional[str]:
+        """Use the text LLM to expand a base VLM caption into a detailed, structured analysis.
+
+        Returns enriched markdown text or None on failure.
+        """
+        try:
+            if not base_description or not base_description.strip():
+                return None
+
+            prompt = (
+                "You are a helpful grocery assistant. Expand the following product description into a structured, consumer-friendly analysis.\n"
+                "Write clear, concise bullet points and short paragraphs. If some details are not visible, infer carefully and mark them as 'likely' rather than asserting.\n\n"
+                "Base description:\n" + base_description.strip() + "\n\n"
+                "Produce the analysis with the following sections (include only relevant ones):\n"
+                "1) Identification (name, product type)\n"
+                "2) Brand/Manufacturer (if visible or likely)\n"
+                "3) Packaging & Size (material, approximate size/volume if inferable)\n"
+                "4) Key Ingredients / Materials (if food or consumable)\n"
+                "5) Nutrition Highlights (if applicable)\n"
+                "6) Uses / How to Use\n"
+                "7) Storage Recommendations\n"
+                "8) Certifications/Badges (organic, non-GMO, vegan, etc., if visible or likely)\n"
+                "9) Safety / Allergen Warnings\n"
+                "10) Shopper Tips (compare unit price, freshness checks, alternatives)\n\n"
+                "Keep it under 250-300 words."
+            )
+
+            enriched = self._call_llm(prompt)
+            if isinstance(enriched, str) and enriched.strip():
+                return enriched.strip()
+            return None
+        except Exception as e:
+            logger.warning(f"LLM enrichment failed; falling back to heuristic enhancement: {e}")
+            return None
+
     def get_health_status(self) -> Dict[str, Any]:
         """Get health status of LLM service."""
         try:
@@ -421,7 +456,7 @@ class LLMService:
                 from PIL import Image
                 import io as _io
 
-                logger.info(f"Using Hugging Face VLM model: {hf_model}")
+                logger.info(f"[VLM] Provider=huggingface Model={hf_model}")
 
                 # Create image object
                 try:
@@ -439,23 +474,23 @@ class LLMService:
                     trust_remote_code = VLM_CONFIG.get("trust_remote_code", False)
                     
                     # Use Microsoft GiT or other standard VLM models
-                    logger.info(f"Loading VLM model: {hf_model}")
+                    logger.info(f"[VLM] Loading model: {hf_model}")
                     
                     # Microsoft GiT and other standard models work with standard pipelines
                     if any(model_name in hf_model.lower() for model_name in ["git", "blip", "vit-gpt2"]):
-                        logger.info("Using standard image-to-text pipeline...")
+                        logger.info("[VLM] Using standard image-to-text pipeline (GiT/BLIP/VIT-GPT2)")
                         
                         # Create standard image-to-text pipeline
                         captioner = pipeline(
-                            "image-to-text", 
+                            task="image-to-text",
                             model=hf_model,
                             trust_remote_code=trust_remote_code,
-                            device_map="cpu",  # Use CPU for compatibility
-                            torch_dtype=torch.float32 if torch.cuda.is_available() == False else torch.float16
+                            device=-1,  # CPU
+                            torch_dtype=torch.float32
                         )
                         
                         # Generate caption with detailed product analysis prompt
-                        logger.info("Generating detailed product analysis...")
+                        logger.info("[VLM] Generating caption and enriching with LLM (if available)...")
                         
                         # Create a comprehensive prompt for product identification and analysis
                         detailed_prompts = [
@@ -473,7 +508,7 @@ class LLMService:
                             try:
                                 # For standard image-to-text models, we can't use custom prompts directly
                                 # But we can analyze the generated caption and enhance it
-                                caption_results = captioner(img)
+                                caption_results = captioner(img, max_new_tokens=64)
                                 
                                 if isinstance(caption_results, list) and caption_results:
                                     result = caption_results[0]
@@ -484,8 +519,13 @@ class LLMService:
                                 else:
                                     base_description = str(caption_results)
                                 
-                                # Enhance the basic caption with product analysis
-                                enhanced_description = self._enhance_product_description(base_description, img)
+                                # First try to enrich with text LLM for detailed structure
+                                enriched = self._enrich_with_llm(base_description)
+                                if enriched:
+                                    enhanced_description = enriched
+                                else:
+                                    # Fall back to heuristic enhancement
+                                    enhanced_description = self._enhance_product_description(base_description, img)
                                 
                                 if len(enhanced_description) > best_length:
                                     best_result = enhanced_description
@@ -512,12 +552,17 @@ class LLMService:
                             else:
                                 description = str(caption_results)
                             
-                            results = {"answer": description.strip()}
+                            # Try to enrich even for basic caption
+                            enriched = self._enrich_with_llm(description)
+                            if enriched:
+                                results = {"answer": enriched.strip()}
+                            else:
+                                results = {"answer": description.strip()}
                             logger.info(f"Basic caption: {results['answer']}")
                         
                     # LLaVA models require different pipeline
                     elif "llava" in hf_model.lower():
-                        logger.info("Using LLaVA image-text-to-text pipeline...")
+                        logger.info("[VLM] Using LLaVA image-text-to-text pipeline")
                         
                         # For LLaVA, we need to use a different approach
                         from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
@@ -554,12 +599,14 @@ class LLMService:
                         if "Analyze this image and provide comprehensive information" in description:
                             description = description.split("Be as detailed and helpful as possible for someone making a purchasing decision.")[-1].strip()
                         
-                        results = {"answer": description}
+                        # Try to enrich LLaVA response as well
+                        enriched = self._enrich_with_llm(description)
+                        results = {"answer": enriched if enriched else description}
                         logger.info(f"LLaVA generated: {results['answer']}")
                         
                     else:
                         # Fallback to basic image analysis
-                        logger.warning(f"Unknown VLM model: {hf_model}, using basic analysis")
+                        logger.warning(f"[VLM] Unknown model family for '{hf_model}', using basic analysis")
                         import numpy as np
                         
                         # Get basic image properties
@@ -610,15 +657,17 @@ class LLMService:
 
 **General Guidance:** For any grocery product, important information to check includes brand name, ingredients, nutritional facts, expiration date, and storage instructions. Look for certifications and compare prices with similar items."""
                         
-                        results = {"answer": description}
+                        # Try to enrich the generic analysis
+                        enriched = self._enrich_with_llm(description)
+                        results = {"answer": enriched if enriched else description}
                         logger.info(f"Basic analysis: {results['answer']}")
                         
                 except ImportError as e:
-                    logger.warning(f"Missing dependencies for VLM: {e}")
+                    logger.warning(f"[VLM] Missing dependencies: {e}")
                     raise
                 except Exception as e:
                     # If the model or pipeline is unavailable, raise to fall back
-                    logger.warning(f"VLM pipeline creation failed: {e}")
+                    logger.warning(f"[VLM] Pipeline/model failed: {e}")
                     if "not found" in str(e).lower() or "does not exist" in str(e).lower():
                         logger.info("Consider checking the model name or using a different VLM provider")
                     raise
@@ -652,12 +701,12 @@ class LLMService:
 
                 return ProductInfoResponse(
                     normalized_product="image",
-                    answer=f"Image description: {description}",
+                    answer=description,
                     caveats=None,
                     confidence=confidence
                 )
             except Exception as hf_exc:
-                logger.warning(f"Hugging Face VLM attempt failed: {hf_exc}; falling back to HTTP VLM if configured")
+                logger.warning(f"[VLM] Hugging Face path failed: {hf_exc}; trying HTTP fallback if configured")
 
         # Fallback: HTTP POST to configured VLM endpoint (existing behaviour)
         try:
@@ -709,7 +758,7 @@ class LLMService:
 
             return ProductInfoResponse(
                 normalized_product="image",
-                answer=f"Image description: {description}",
+                answer=description,
                 caveats=None,
                 confidence=confidence
             )
