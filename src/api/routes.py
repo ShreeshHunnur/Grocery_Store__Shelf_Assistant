@@ -167,7 +167,7 @@ async def process_voice_query(
                     
                     # Process the query through the orchestrator
                     from .main import orchestrator
-                    response = orchestrator.process_text_query(transcribed_text, session_id)
+                    response = orchestrator.process_text_query(transcribed_text, session_id, input_method="voice")
                     
                     # Check if response is an error
                     if "error" in response:
@@ -289,6 +289,13 @@ async def process_vision_image(image_file: UploadFile = File(...), session_id: O
 
     Returns a ProductInfoResponse-like dict with an image description and confidence.
     """
+    import time
+    import uuid
+    from src.services.analytics_service import QueryAnalytics
+    
+    start_time = time.time()
+    trace_id = str(uuid.uuid4())[:8]
+    
     try:
         logger.info(f"Processing vision image: {image_file.filename}")
 
@@ -316,12 +323,46 @@ async def process_vision_image(image_file: UploadFile = File(...), session_id: O
                 details={"message": str(e)}
             ).dict())
 
+        # Track analytics for vision query
+        try:
+            latency_ms = int((time.time() - start_time) * 1000)
+            analytics = QueryAnalytics(
+                session_id=session_id or f"session_{trace_id}",
+                query_text=f"Image analysis: {image_file.filename}",
+                query_type="vision",
+                input_method="image",
+                response_time_ms=latency_ms,
+                confidence_score=vision_response.confidence if hasattr(vision_response, 'confidence') else None,
+                success=True
+            )
+            orchestrator.analytics_service.track_query(analytics)
+        except Exception as e:
+            logger.warning(f"Failed to track analytics for vision query: {e}")
+
         # vision_response is a ProductInfoResponse
         return vision_response.dict()
 
     except HTTPException:
         raise
     except Exception as e:
+        # Track failed vision query in analytics
+        try:
+            latency_ms = int((time.time() - start_time) * 1000)
+            analytics = QueryAnalytics(
+                session_id=session_id or f"session_{trace_id}",
+                query_text=f"Image analysis: {image_file.filename if 'image_file' in locals() else 'unknown'}",
+                query_type="vision",
+                input_method="image",
+                response_time_ms=latency_ms,
+                confidence_score=0.0,
+                success=False,
+                error_message=str(e)
+            )
+            from .main import orchestrator
+            orchestrator.analytics_service.track_query(analytics)
+        except Exception:
+            pass  # Don't fail on analytics tracking failure
+        
         logger.error(f"Error processing vision image: {e}")
         raise HTTPException(status_code=500, detail=ErrorResponse(
             error="Failed to process image",

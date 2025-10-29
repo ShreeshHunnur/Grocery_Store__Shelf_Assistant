@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShelfSense AI Analytics - Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css" type="text/css">
+    <link rel="stylesheet" href="/static/analytics.css" type="text/css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <meta name="description" content="ShelfSense AI Analytics Dashboard - Comprehensive insights into user queries and system performance">
+    <meta name="theme-color" content="#6366F1">
+</head>
+<body>
+    <div class="analytics-container">
+        <!-- Navigation Header -->
+        <nav class="analytics-nav">
+            <div class="nav-brand">
+                <div class="brand-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>ShelfSense Analytics</h1>
+                    <span>Real-time Insights Dashboard</span>
+                </div>
+            </div>
+            <div class="nav-actions">
+                <div class="time-filter">
+                    <select id="time-range" class="filter-select">
+                        <option value="7">Last 7 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                    </select>
+                </div>
+                <button class="nav-btn" id="refresh-btn" title="Refresh data">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="nav-btn" id="export-btn" title="Export data">
+                    <i class="fas fa-download"></i>
+                </button>
+                <a href="/ui" class="nav-btn" title="Back to main app">
+                    <i class="fas fa-home"></i>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Real-time Status Bar -->
+        <div class="status-banner">
+            <div class="status-item">
+                <i class="fas fa-pulse status-pulse"></i>
+                <span>Live</span>
+            </div>
+            <div class="status-item" id="last-updated">
+                <i class="fas fa-clock"></i>
+                <span>Updated: <span id="update-time">Loading...</span></span>
+            </div>
+            <div class="status-item" id="system-health">
+                <i class="fas fa-heart"></i>
+                <span>System: <span id="health-status">Checking...</span></span>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Content -->
+        <main class="analytics-main">
+            <!-- Overview Cards -->
+            <section class="overview-section">
+                <div class="metrics-grid">
+                    <div class="metric-card primary-metric">
+                        <div class="metric-header">
+                            <div class="metric-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <div class="metric-info">
+                                <h3>Total Queries</h3>
+                                <div class="metric-value" id="total-queries">-</div>
+                                <div class="metric-change" id="queries-change">+0%</div>
+                            </div>
+                        </div>
+                        <div class="metric-chart" id="queries-sparkline"></div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="metric-info">
+                                <h3>Active Sessions</h3>
+                                <div class="metric-value" id="active-sessions">-</div>
+                                <div class="metric-change" id="sessions-change">+0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="metric-info">
+                                <h3>Avg Response Time</h3>
+                                <div class="metric-value" id="avg-response-time">-</div>
+                                <div class="metric-change" id="response-time-change">+0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="metric-info">
+                                <h3>Success Rate</h3>
+                                <div class="metric-value" id="success-rate">-</div>
+                                <div class="metric-change" id="success-rate-change">+0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon">
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <div class="metric-info">
+                                <h3>Avg Confidence</h3>
+                                <div class="metric-value" id="avg-confidence">-</div>
+                                <div class="metric-change" id="confidence-change">+0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-icon">
+                                <i class="fas fa-trophy"></i>
+                            </div>
+                            <div class="metric-info">
+                                <h3>Top Product</h3>
+                                <div class="metric-value" id="top-product">-</div>
+                                <div class="metric-subtitle" id="top-product-count">- searches</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section class="charts-section">
+                <div class="charts-grid">
+                    <!-- Query Trends Chart -->
+                    <div class="chart-card large-chart">
+                        <div class="chart-header">
+                            <h3>Query Trends</h3>
+                            <div class="chart-controls">
+                                <button class="chart-btn active" data-chart="queries">Queries</button>
+                                <button class="chart-btn" data-chart="response-time">Response Time</button>
+                                <button class="chart-btn" data-chart="success-rate">Success Rate</button>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="trends-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Input Methods Distribution -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Input Methods</h3>
+                            <div class="chart-legend" id="input-methods-legend"></div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="input-methods-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Query Types Distribution -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Query Types</h3>
+                            <div class="chart-legend" id="query-types-legend"></div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="query-types-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Peak Hours Chart -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Peak Usage Hours</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="peak-hours-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Response Time Distribution -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Response Time Distribution</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="response-time-dist-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Tables Section -->
+            <section class="tables-section">
+                <div class="tables-grid">
+                    <!-- Popular Products -->
+                    <div class="table-card">
+                        <div class="table-header">
+                            <h3>Popular Products</h3>
+                            <div class="table-controls">
+                                <input type="text" placeholder="Search products..." class="search-input" id="products-search">
+                                <button class="table-btn" id="products-export">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-container" id="popular-products-table">
+                            <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- Busiest Locations -->
+                    <div class="table-card">
+                        <div class="table-header">
+                            <h3>Busiest Locations</h3>
+                        </div>
+                        <div class="table-container" id="busiest-locations-table">
+                            <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activities -->
+                    <div class="table-card large-table">
+                        <div class="table-header">
+                            <h3>Recent Activities</h3>
+                            <div class="table-controls">
+                                <select class="filter-select" id="activity-filter">
+                                    <option value="all">All Activities</option>
+                                    <option value="voice">Voice Queries</option>
+                                    <option value="text">Text Queries</option>
+                                    <option value="vision">Vision Queries</option>
+                                </select>
+                                <button class="table-btn" id="activities-refresh">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-container" id="recent-activities-table">
+                            <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loading-content">
+                <div class="loading-spinner large">
+                    <i class="fas fa-chart-line fa-spin"></i>
+                </div>
+                <h3>Loading Analytics...</h3>
+                <p>Gathering insights from your data</p>
+            </div>
+        </div>
+
+        <!-- Error Toast -->
+        <div id="error-toast" class="error-toast hidden">
+            <div class="toast-content">
+                <div class="toast-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="toast-message">
+                    <h4>Analytics Error</h4>
+                    <p id="error-message"></p>
+                </div>
+                <button class="toast-close" id="close-error">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div id="export-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Export Analytics Data</h3>
+                    <button class="modal-close" id="close-export-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="export-options">
+                        <div class="option-group">
+                            <label>Time Range:</label>
+                            <select id="export-time-range" class="export-select">
+                                <option value="7">Last 7 days</option>
+                                <option value="30">Last 30 days</option>
+                                <option value="90">Last 90 days</option>
+                            </select>
+                        </div>
+                        <div class="option-group">
+                            <label>Format:</label>
+                            <select id="export-format" class="export-select">
+                                <option value="json">JSON</option>
+                                <option value="csv">CSV</option>
+                            </select>
+                        </div>
+                        <div class="option-group">
+                            <label>Include:</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" checked> Overview Metrics
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" checked> Query Trends
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" checked> Product Analytics
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" checked> Location Data
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="modal-btn secondary" id="cancel-export">Cancel</button>
+                    <button class="modal-btn primary" id="confirm-export">
+                        <i class="fas fa-download"></i>
+                        Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/analytics.js"></script>
+</body>
+</html>

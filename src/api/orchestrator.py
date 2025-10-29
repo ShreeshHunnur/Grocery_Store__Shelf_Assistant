@@ -14,6 +14,7 @@ from pathlib import Path
 from ..nlu.router import QueryRouter, ClassificationResult
 from ..services.db_queries import DatabaseService
 from ..services.llm_service import LLMService
+from ..services.analytics_service import AnalyticsService, QueryAnalytics, ProductSearch, LocationQuery
 from ..api.models import ProductLocationResponse, ProductInfoResponse, ErrorResponse
 from config.settings import DATABASE_CONFIG, LLM_CONFIG
 
@@ -39,6 +40,7 @@ class BackendOrchestrator:
         self.router = QueryRouter(self.db_path)
         self.db_service = DatabaseService(self.db_path)
         self.llm_service = LLMService()
+        self.analytics_service = AnalyticsService(self.db_path)
         # Embedding / FAISS setup (optional)
         self.embedding_model = None
         self.faiss_index = None
@@ -139,7 +141,7 @@ class BackendOrchestrator:
         """Get LLM service instance."""
         return self.llm_service
     
-    def process_text_query(self, query: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+    def process_text_query(self, query: str, session_id: Optional[str] = None, input_method: str = "text") -> Dict[str, Any]:
         """
         Process text query through the full pipeline.
         
@@ -179,11 +181,83 @@ class BackendOrchestrator:
                 disambiguation_needed=classification.disambiguation_needed
             )
             
+            # Step 4: Track analytics
+            try:
+                logger.info(f"[{trace_id}] Starting analytics tracking...")
+                # Create analytics object
+                analytics = QueryAnalytics(
+                    session_id=session_id or f"session_{trace_id}",
+                    query_text=query,
+                    query_type=classification.route,
+                    input_method=input_method,
+                    response_time_ms=int(latency_ms),
+                    confidence_score=classification.confidence,
+                    success=True
+                )
+                
+                logger.info(f"[{trace_id}] Created analytics object: {analytics}")
+                
+                # Track the main query
+                query_id = self.analytics_service.track_query(analytics)
+                logger.info(f"[{trace_id}] Tracked query with ID: {query_id}")
+                
+                # Track products and locations if this was a location query
+                if classification.route == "location" and "matches" in response:
+                    logger.info(f"[{trace_id}] Tracking location query with {len(response['matches'])} matches")
+                    # Track product searches
+                    if classification.normalized_product:
+                        product_search = ProductSearch(
+                            query_id=query_id,
+                            normalized_product=classification.normalized_product,
+                            original_product=query,
+                            found=len(response["matches"]) > 0,
+                            match_count=len(response["matches"]),
+                            best_match_confidence=response["matches"][0].get("confidence") if response["matches"] else None,
+                            disambiguation_needed=classification.disambiguation_needed
+                        )
+                        self.analytics_service.track_product_search(product_search)
+                        logger.info(f"[{trace_id}] Tracked product search for: {classification.normalized_product}")
+                    
+                    # Track location queries
+                    for i, match in enumerate(response["matches"]):
+                        if match.get("aisle") or match.get("bay") or match.get("shelf"):
+                            location_query = LocationQuery(
+                                query_id=query_id,
+                                product_name=match.get("product_name", ""),
+                                aisle=match.get("aisle"),
+                                bay=match.get("bay"),
+                                shelf=match.get("shelf"),
+                                confidence=match.get("confidence")
+                            )
+                            self.analytics_service.track_location_query(location_query)
+                            logger.info(f"[{trace_id}] Tracked location query {i+1} for: {match.get('product_name', '')}")
+                
+                logger.info(f"[{trace_id}] Analytics tracking completed successfully")
+                
+            except Exception as e:
+                logger.error(f"[{trace_id}] Failed to track analytics for query: {e}", exc_info=True)
+            
             self._log_response(trace_id, metrics)
             
             return response
             
         except Exception as e:
+            # Track failed query in analytics
+            try:
+                analytics = QueryAnalytics(
+                    session_id=session_id or f"session_{trace_id}",
+                    query_text=query,
+                    query_type="unknown",
+                    input_method=input_method,
+                    response_time_ms=int((time.time() - start_time) * 1000),
+                    confidence_score=0.0,
+                    success=False,
+                    error_message=str(e)
+                )
+                self.analytics_service.track_query(analytics)
+            except Exception:
+                pass  # Don't fail on analytics tracking failure
+            
             logger.error(f"[{trace_id}] Error processing query: {e}", exc_info=True)
             return self._create_error_response("Internal processing error", "PROCESSING_ERROR", trace_id)
     

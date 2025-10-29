@@ -52,6 +52,10 @@ app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
 # Include API routes
 app.include_router(router, prefix="/api/v1")
 
+# Include analytics routes
+from .analytics_routes import analytics_router
+app.include_router(analytics_router, prefix="/api/v1")
+
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -108,6 +112,17 @@ async def web_ui():
     else:
         return {"message": "Web UI not found. Please ensure index.html exists in the web directory."}
 
+# Serve analytics dashboard
+@app.get("/analytics")
+async def analytics_dashboard():
+    """Serve the analytics dashboard."""
+    from fastapi.responses import FileResponse
+    analytics_file = BASE_DIR / "web" / "analytics.html"
+    if analytics_file.exists():
+        return FileResponse(analytics_file)
+    else:
+        return {"message": "Analytics dashboard not found. Please ensure analytics.html exists in the web directory."}
+
 # Serve CSS directly to avoid StaticFiles issues in Electron
 @app.get("/static/styles.css")
 async def serve_css():
@@ -121,6 +136,19 @@ async def serve_css():
     else:
         return Response("/* CSS file not found */", media_type="text/css", status_code=404)
 
+# Serve analytics CSS
+@app.get("/static/analytics.css")
+async def serve_analytics_css():
+    """Serve the analytics CSS file directly."""
+    from fastapi.responses import Response
+    css_file = BASE_DIR / "web" / "analytics.css"
+    if css_file.exists():
+        with open(css_file, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+        return Response(content=css_content, media_type="text/css")
+    else:
+        return Response("/* Analytics CSS file not found */", media_type="text/css", status_code=404)
+
 # Serve JS directly to avoid StaticFiles issues in Electron
 @app.get("/static/app.js")
 async def serve_js():
@@ -133,6 +161,19 @@ async def serve_js():
         return Response(content=js_content, media_type="application/javascript")
     else:
         return Response("// JS file not found", media_type="application/javascript", status_code=404)
+
+# Serve analytics JS
+@app.get("/static/analytics.js")
+async def serve_analytics_js():
+    """Serve the analytics JavaScript file directly."""
+    from fastapi.responses import Response
+    js_file = BASE_DIR / "web" / "analytics.js"
+    if js_file.exists():
+        with open(js_file, 'r', encoding='utf-8') as f:
+            js_content = f.read()
+        return Response(content=js_content, media_type="application/javascript")
+    else:
+        return Response("// Analytics JS file not found", media_type="application/javascript", status_code=404)
 
 # Debug endpoint to test static file serving
 @app.get("/debug/static")
