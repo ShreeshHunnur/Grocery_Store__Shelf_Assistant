@@ -1,177 +1,540 @@
-# Retail Shelf Assistant
+# Grocery Store Shelf Assistant
 
-A voice-enabled retail assistant that helps customers find product locations and get product information using a local LLM and an SQLite product catalog. This README explains how to clone, set up, seed the database, run the backend, and run the Electron desktop wrapper on Windows (and how to run on Linux/macOS).
+A comprehensive multi-modal retail assistant that helps customers find product locations and get product information using voice, text, and vision inputs. The system combines local LLMs, SQLite product catalog, and advanced AI models for a complete grocery assistance experience.
 
----
+## 🚀 Features
 
-## Prerequisites
+- **🎤 Voice Interface**: Speech-to-text product queries with audio responses
+- **💬 Text Interface**: Fast text-based product search and information
+- **👁️ Vision Interface**: Image-based product recognition and location finding
+- **📊 Analytics Dashboard**: Real-time query tracking and performance monitoring
+- **🖥️ Cross-Platform**: Web browser, Electron desktop app, and API access
+- **🔍 Smart Search**: Hybrid search with FTS and vector similarity
+- **🤖 Local AI**: Privacy-focused with local LLM inference via Ollama
 
-- Python 3.11+ (3.12 recommended). Ensure `python` on PATH points to the correct interpreter.
-- Git
-- Node.js + npm (only required for the Electron wrapper)
-- Optional: CUDA-capable GPU and appropriate PyTorch build for local LLMs (if you plan to run large models locally).
+## 📋 System Requirements
 
-Note: Some optional packages (FAISS) can be platform-sensitive on Windows. See the "Optional: Vector search / FAISS" section.
+### Minimum Requirements
+- **OS**: Windows 10+, macOS 10.15+, or Linux (Ubuntu 18.04+)
+- **Python**: 3.11 or higher (3.12 recommended)
+- **RAM**: 2GB available memory
+- **Storage**: 3GB free space
+- **CPU**: 4 cores (x64 architecture)
+- **Network**: 10 Mbps for model downloads
 
----
+### Recommended Requirements
+- **RAM**: 4GB+ (6GB+ with AI models loaded)
+- **Storage**: 5GB+ free space
+- **CPU**: 8 cores for optimal performance
+- **Network**: 50 Mbps for faster setup
+- **GPU**: CUDA-compatible GPU (optional, for faster AI inference)
 
-## Clone the repository
+## 🛠️ Installation Guide
 
-```powershell
-git clone https://your.git.url/repo.git
-cd grocery_assistant_project
-```
-
----
-
-## Create and activate a Python virtual environment
-
-Windows (PowerShell):
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-macOS / Linux (bash):
+### 📥 Step 1: Clone the Repository
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+git clone https://github.com/ShreeshHunnur/Grocery_Store__Shelf_Assistant.git
+cd Grocery_Store__Shelf_Assistant
 ```
 
----
+### 🐍 Step 2: Set Up Python Environment
 
-## Install Python dependencies
-
+#### Windows (PowerShell)
 ```powershell
-pip install --upgrade pip
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+.\.venv\Scripts\Activate.ps1
+
+# Upgrade pip
+python -m pip install --upgrade pip
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-Notes:
-- On Windows, `faiss-cpu` wheels may be limited for some Python versions. If you need FAISS, try a pip-installable version (for example `faiss-cpu==1.12.0`) or use conda: `conda install -c conda-forge faiss-cpu`.
-- If you plan to run local LLMs (Mistral/other large models), install `torch` with the appropriate CUDA variant per the PyTorch instructions.
+#### macOS
+```bash
+# Create virtual environment
+python3 -m venv .venv
 
----
+# Activate virtual environment
+source .venv/bin/activate
 
-## Initialize or regenerate the product database
+# Upgrade pip
+python -m pip install --upgrade pip
 
-This project ships with a deterministic seed generator to create a realistic store catalog in `data/products.db`.
+# Install dependencies
+pip install -r requirements.txt
 
-To (re)generate the database (default: 1000 products):
+# Install additional macOS dependencies
+brew install ffmpeg  # For audio processing
+```
 
+#### Linux (Ubuntu/Debian)
+```bash
+# Install system dependencies
+sudo apt update
+sudo apt install -y python3-pip python3-venv ffmpeg portaudio19-dev python3-dev
+
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Upgrade pip
+python -m pip install --upgrade pip
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+#### Linux (CentOS/RHEL/Fedora)
+```bash
+# Install system dependencies
+sudo dnf install -y python3-pip python3-virtualenv ffmpeg portaudio-devel python3-devel
+
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Upgrade pip
+python -m pip install --upgrade pip
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 🗄️ Step 3: Initialize the Database
+
+Generate the product database with sample data:
+
+#### Windows
 ```powershell
+# Create data directory
+New-Item -ItemType Directory -Force -Path .\data
+
+# Generate database with 1000 products
 python .\database\seed_data.py --products 1000 --output .\data\products.db
 ```
 
-Notes:
-- Running the seed script will overwrite/create the `data/products.db` file at the path you pass with `--output`.
-- If you want to start from a clean slate you can delete the file first:
+#### macOS/Linux
+```bash
+# Create data directory
+mkdir -p ./data
 
-```powershell
-Remove-Item .\data\products.db -Force
+# Generate database with 1000 products
+python ./database/seed_data.py --products 1000 --output ./data/products.db
 ```
 
----
+### 🤖 Step 4: Set Up AI Models
 
-## Optional: download models (STT / large LLMs)
+#### Install Ollama (Required for LLM)
 
-- Whisper STT (if used):
-
+**Windows:**
+1. Download Ollama from [ollama.ai](https://ollama.ai/download)
+2. Run the installer
+3. Open PowerShell and install models:
 ```powershell
-python -c "import whisper; whisper.load_model('base')"
+ollama pull mistral
+# or
+ollama pull phi3
 ```
 
-- Local LLM (Mistral example): this will download large model files (several GB). Only needed if using local inference.
+**macOS:**
+```bash
+# Install via Homebrew
+brew install ollama
 
-```powershell
-python -c "from transformers import AutoTokenizer, AutoModelForCausalLM; AutoTokenizer.from_pretrained('mistralai/Mistral-7B-Instruct-v0.1'); AutoModelForCausalLM.from_pretrained('mistralai/Mistral-7B-Instruct-v0.1')"
+# Start Ollama service
+brew services start ollama
+
+# Install models
+ollama pull mistral
+ollama pull phi3
 ```
 
-If you don't plan to run local LLMs you can configure the project to use a remote LLM/backend — see `config/settings.py`.
+**Linux:**
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
 
----
+# Start Ollama service
+systemctl start ollama
 
-## Run the backend API (development)
-
-Start the FastAPI app using `uvicorn` (from repo root; with virtualenv activated):
-
-```powershell
-uvicorn src.api.main:app --host 127.0.0.1 --port 8000 --reload
+# Install models
+ollama pull mistral
+ollama pull phi3
 ```
 
-Health check:
+#### Install FFmpeg (Required for Voice)
 
+**Windows:**
+- Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+- Add to system PATH, or install via winget:
 ```powershell
-Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -Method Get
+winget install Gyan.FFmpeg
 ```
 
-API endpoints (short):
-- `POST /api/v1/ask` - text queries (JSON: {"query":"...","session_id":"..."})
-- `POST /api/v1/ask-voice` - multipart upload for audio
-- `GET /health` - health status
+**macOS:**
+```bash
+brew install ffmpeg
+```
 
----
+**Linux:**
+```bash
+# Ubuntu/Debian
+sudo apt install ffmpeg
 
-## Run the web UI (browser)
+# CentOS/RHEL/Fedora
+sudo dnf install ffmpeg
+```
 
-When the backend is running, open `http://127.0.0.1:8000/ui` in your browser to access the UI.
+### 🎵 Step 5: Verify Audio Setup
 
----
+Check if voice dependencies are properly installed:
 
-## Run as a desktop app (Electron) — Windows (dev)
+```bash
+python scripts/check_voice_deps.py
+```
 
-The `electron/` folder contains a lightweight wrapper that spawns the Python backend and loads the UI.
+This will verify:
+- FFmpeg availability
+- Speech recognition libraries
+- Audio device detection
 
-1. Ensure Python venv is activated and backend dependencies are installed (see above).
-2. From a PowerShell prompt in the repository root, start Electron:
+## 🚀 Running the Application
 
+### 🌐 Method 1: Web Interface (Recommended)
+
+1. **Start the Backend Server:**
+
+#### Windows
+```powershell
+# Ensure virtual environment is activated
+.\.venv\Scripts\Activate.ps1
+
+# Start the server
+python scripts\start_server.py
+# or manually:
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### macOS/Linux
+```bash
+# Ensure virtual environment is activated
+source .venv/bin/activate
+
+# Start the server
+python scripts/start_server.py
+# or manually:
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+2. **Access the Application:**
+   - Open your browser and go to: `http://localhost:8000/ui`
+   - For analytics dashboard: `http://localhost:8000/analytics.html`
+
+3. **Verify Health:**
+   ```bash
+   curl http://localhost:8000/health
+   ```
+
+### 🖥️ Method 2: Desktop App (Electron)
+
+1. **Install Node.js Dependencies:**
+
+#### Windows
 ```powershell
 cd electron
 npm install
+```
+
+#### macOS/Linux
+```bash
+cd electron
+npm install
+```
+
+2. **Start the Desktop App:**
+
+#### Windows
+```powershell
 npm start
 ```
 
-Notes:
-- The Electron main script spawns `scripts/start_server.py` using the `python` executable in PATH. Set `PYTHON_EXECUTABLE` if you need a specific interpreter.
-- Packaging a single executable requires bundling a Python runtime and is out of scope for this repo; consider `electron-builder` plus a bundled Python installer.
-
----
-
-## Troubleshooting tips
-
-- If the app returns product names for generic informational queries (e.g. "what is 2 + 2"), restart the server after pulling the latest code — recent changes ensure information intents do not query the product DB.
-- PowerShell `curl` gotchas: use `Invoke-RestMethod` or `curl.exe` directly when posting JSON with headers to avoid PowerShell header-binding issues.
-- FAISS install errors on Windows: try `pip install faiss-cpu==1.12.0` or use conda `conda install -c conda-forge faiss-cpu`.
-- If embedding/FAISS build fails during seeding, the script will skip vector index creation but still generate the DB and FTS index.
-
----
-
-## Development and testing
-
-- Run unit tests (from repo root; venv active):
-
-```powershell
-pytest
+#### macOS/Linux
+```bash
+npm start
 ```
 
-- Smoke tests and demo scripts are in the `scripts/` folder (e.g., `scripts/test_api_contracts.py`, `scripts/start_server.py`).
+The Electron app will automatically start the Python backend and open the desktop interface.
+
+### 📱 Method 3: API Only
+
+For development or integration purposes:
+
+```bash
+# Start only the API server
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+
+# Test API endpoints
+curl -X POST "http://localhost:8000/api/v1/ask" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "Where can I find milk?", "session_id": "test123"}'
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+
+# Database Configuration
+DATABASE_PATH=./data/products.db
+
+# LLM Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=mistral
+
+# Audio Configuration
+AUDIO_SAMPLE_RATE=16000
+AUDIO_CHANNELS=1
+
+# Vision Configuration
+VISION_MODEL=microsoft/git-base-coco
+```
+
+### Advanced Configuration
+
+Edit `config/settings.py` for detailed configuration options:
+
+```python
+# LLM settings
+LLM_CONFIG = {
+    "base_url": "http://localhost:11434",
+    "model_name": "mistral",  # or "phi3"
+    "max_tokens": 200,
+    "temperature": 0.3,
+    "timeout": 60
+}
+
+# Audio settings
+AUDIO_CONFIG = {
+    "sample_rate": 16000,
+    "channels": 1,
+    "max_recording_duration": 10,
+}
+```
+
+## 🧪 Testing
+
+### Run All Tests
+```bash
+# Activate virtual environment first
+python -m pytest
+
+# Run with coverage
+python -m pytest --cov=src tests/
+```
+
+### Performance Testing
+```bash
+# Quick performance test
+python scripts/quick_performance_test.py
+
+# Comprehensive performance test
+python scripts/performance_test.py --mode all --iterations 5
+
+# Test specific mode
+python scripts/performance_test.py --mode voice --iterations 10
+```
+
+### API Contract Testing
+```bash
+python scripts/test_api_contracts.py
+```
+
+### Component Testing
+```bash
+# Test LLM integration
+python scripts/test_llm_service.py
+
+# Test voice processing
+python scripts/test_voice_io.py
+
+# Test analytics
+python scripts/test_analytics.py
+```
+
+## 📊 Performance Monitoring
+
+### Real-time Analytics
+Access the analytics dashboard at: `http://localhost:8000/analytics.html`
+
+Features:
+- Query performance metrics
+- Popular product searches
+- Success/failure rates
+- Response time trends
+
+### Generate Performance Reports
+```bash
+# Create performance visualizations
+python scripts/performance_visualizations.py
+
+# Export analytics data
+python scripts/validate_analytics.py
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### 1. Voice Processing Fails
+```bash
+# Check voice dependencies
+python scripts/check_voice_deps.py
+
+# Test audio devices
+python scripts/test_microphone_level.py
+```
+
+#### 2. LLM Not Responding
+```bash
+# Check Ollama status
+ollama list
+
+# Test LLM connection
+python scripts/test_ollama_integration.py
+```
+
+#### 3. Database Issues
+```bash
+# Regenerate database
+python database/seed_data.py --products 1000 --output ./data/products.db
+
+# Test database queries
+python scripts/test_db_queries.py
+```
+
+#### 4. Port Already in Use
+```bash
+# Windows - kill process on port 8000
+netstat -ano | findstr 8000
+taskkill /PID <process_id> /F
+
+# macOS/Linux - kill process on port 8000
+lsof -ti:8000 | xargs kill -9
+```
+
+### Platform-Specific Issues
+
+#### Windows
+- **Permission Errors**: Run PowerShell as Administrator
+- **Path Issues**: Ensure Python and Git are in system PATH
+- **FFmpeg Issues**: Install via winget or add to PATH manually
+
+#### macOS
+- **Homebrew Required**: Install Homebrew for easy dependency management
+- **Microphone Permissions**: Grant microphone access in System Preferences
+- **M1/M2 Macs**: Some dependencies may need Rosetta 2
+
+#### Linux
+- **Audio Issues**: Install PulseAudio development headers
+- **Permission Errors**: Add user to audio group: `sudo usermod -a -G audio $USER`
+- **Display Issues**: For desktop app, ensure X11/Wayland support
+
+## 📁 Project Structure
+
+```
+grocery_assistant_project/
+├── 📁 config/              # Configuration files
+├── 📁 data/                # Database and data files
+├── 📁 database/            # Database schema and seed scripts
+├── 📁 electron/            # Electron desktop app
+├── 📁 logs/                # Application logs
+├── 📁 performance_charts/  # Performance visualization outputs
+├── 📁 scripts/             # Utility and test scripts
+├── 📁 src/                 # Main application source code
+│   ├── 📁 api/             # FastAPI application
+│   ├── 📁 nlu/             # Natural Language Understanding
+│   ├── 📁 services/        # Core business logic services
+│   └── 📁 tests/           # Unit tests
+├── 📁 web/                 # Web UI assets
+├── 📄 requirements.txt     # Python dependencies
+└── 📄 README.md           # This file
+```
+
+## 🚀 Development
+
+### Setting Up Development Environment
+
+1. **Fork and Clone:**
+```bash
+git clone https://github.com/YOUR_USERNAME/Grocery_Store__Shelf_Assistant.git
+cd Grocery_Store__Shelf_Assistant
+```
+
+2. **Install Development Dependencies:**
+```bash
+pip install -r requirements.txt
+pip install -r requirements-dev.txt  # If available
+```
+
+3. **Pre-commit Hooks:**
+```bash
+pre-commit install
+```
+
+### Contributing
+
+1. Create a feature branch: `git checkout -b feature/amazing-feature`
+2. Commit changes: `git commit -m 'Add amazing feature'`
+3. Push to branch: `git push origin feature/amazing-feature`
+4. Open a Pull Request
+
+## 📚 API Documentation
+
+Once the server is running, access:
+- **Interactive API Docs**: `http://localhost:8000/docs`
+- **ReDoc Documentation**: `http://localhost:8000/redoc`
+
+### Key Endpoints
+
+- `GET /health` - System health check
+- `POST /api/v1/ask` - Text-based queries
+- `POST /api/v1/ask-voice` - Voice-based queries
+- `POST /api/v1/vision` - Image-based queries
+- `GET /analytics/*` - Analytics dashboard endpoints
+
+## 🔒 Security Notes
+
+- **Local Processing**: All AI models run locally for privacy
+- **No External APIs**: Voice and vision processing happens on-device
+- **Secure Defaults**: CORS and input validation enabled
+- **Data Privacy**: No query data sent to external services
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Support
+
+- **Issues**: [GitHub Issues](https://github.com/ShreeshHunnur/Grocery_Store__Shelf_Assistant/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ShreeshHunnur/Grocery_Store__Shelf_Assistant/discussions)
+- **Wiki**: [Project Wiki](https://github.com/ShreeshHunnur/Grocery_Store__Shelf_Assistant/wiki)
 
 ---
 
-## Important files and where to look
-
-- `database/schema.sql` — DB schema
-- `database/seed_data.py` — deterministic data generator
-- `src/api/` — FastAPI app, routes, orchestrator
-- `src/services/` — DB queries, LLM service, audio I/O
-- `electron/` — Electron wrapper to run desktop app
-
----
-
-If you'd like, I can also:
-- add a short PowerShell helper script `scripts/run_dev.ps1` that activates the venv and launches Electron;
-- add a short `PACKAGING.md` that outlines options for bundling Python with Electron on Windows.
-
-Thank you — tell me which of the optional helpers you'd like next.
+**Happy Coding! 🛒🤖**
