@@ -119,10 +119,31 @@ async def process_voice_query(
                 wav_path = temp_file_path.replace('.webm', '.wav')
                 
                 # Use FFmpeg to convert WebM to WAV
-                ffmpeg_exe = r'C:\Users\Shreesh\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0-full_build\bin\ffmpeg.exe'
+                ffmpeg_exe = None
+                possible_ffmpeg_paths = [
+                    r'C:\Users\Shreesh\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0-full_build\bin\ffmpeg.exe',
+                    r'C:\Program Files\ffmpeg\bin\ffmpeg.exe',
+                    r'C:\ffmpeg\bin\ffmpeg.exe',
+                    'ffmpeg.exe'  # Try system PATH
+                ]
                 
-                if not os.path.exists(ffmpeg_exe):
-                    raise FileNotFoundError(f"FFmpeg not found at {ffmpeg_exe}")
+                # Find available FFmpeg
+                for path in possible_ffmpeg_paths:
+                    try:
+                        if path == 'ffmpeg.exe':
+                            # Test if ffmpeg is in PATH
+                            result = subprocess.run([path, '-version'], capture_output=True, timeout=5)
+                            if result.returncode == 0:
+                                ffmpeg_exe = path
+                                break
+                        elif os.path.exists(path):
+                            ffmpeg_exe = path
+                            break
+                    except:
+                        continue
+                
+                if not ffmpeg_exe:
+                    raise FileNotFoundError("FFmpeg not found. Please install FFmpeg and add it to PATH.")
                 
                 logger.info(f"Using FFmpeg at: {ffmpeg_exe}")
                 
@@ -254,7 +275,34 @@ async def process_voice_query(
                     )
                 else:
                     logger.error(f"FFmpeg failed: {result.stderr}")
-                    raise Exception(f"FFmpeg conversion failed: {result.stderr}")
+                    error_msg = result.stderr
+                    
+                    # Check for specific error types
+                    if "Invalid data found when processing input" in error_msg:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=ErrorResponse(
+                                error="Invalid audio file",
+                                error_code="INVALID_AUDIO_FORMAT",
+                                details={
+                                    "message": "The uploaded file is not a valid audio format or is corrupted. Please upload a valid audio file (WAV, MP3, M4A, FLAC, or WebM)."
+                                }
+                            ).dict()
+                        )
+                    elif "Format" in error_msg and "detected only with low score" in error_msg:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=ErrorResponse(
+                                error="Audio format not recognized",
+                                error_code="UNRECOGNIZED_AUDIO_FORMAT",
+                                details={
+                                    "message": "The audio format could not be recognized. Please use WAV, MP3, M4A, FLAC, or WebM format."
+                                }
+                            ).dict()
+                        )
+                    else:
+                        # Generic FFmpeg error
+                        raise Exception(f"FFmpeg conversion failed: {error_msg}")
             finally:
                 # Clean up temporary files
                 import os

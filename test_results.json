@@ -1,0 +1,42 @@
+{
+  "analysis": {
+    "summary": {
+      "total_tests": 1,
+      "total_time_seconds": 2.3650028705596924,
+      "successful_tests": 1,
+      "failed_tests": 0,
+      "success_rate": 100.0
+    },
+    "by_mode": {
+      "text": {
+        "total_tests": 1,
+        "successful": 1,
+        "failed": 0,
+        "success_rate": 100.0,
+        "avg_payload_size_kb": 0.0830078125,
+        "performance": {
+          "avg_response_time_ms": 2364.0050888061523,
+          "min_response_time_ms": 2364.0050888061523,
+          "max_response_time_ms": 2364.0050888061523,
+          "median_response_time_ms": 2364.0050888061523,
+          "std_dev_ms": 0
+        },
+        "avg_confidence": 1.0
+      }
+    }
+  },
+  "detailed_results": [
+    {
+      "mode": "text",
+      "query": "Where can I find milk?",
+      "response_time_ms": 2364.0050888061523,
+      "status_code": 200,
+      "success": true,
+      "confidence_score": 1.0,
+      "matches_found": 1,
+      "error_message": null,
+      "payload_size_bytes": 85
+    }
+  ],
+  "timestamp": "2025-10-30T09:44:31.473376"
+}

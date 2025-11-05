@@ -1,0 +1,31 @@
+{
+  "performance_config": {
+    "base_url": "http://localhost:8000",
+    "timeouts": {
+      "text_timeout": 15,
+      "voice_timeout": 30,
+      "vision_timeout": 30,
+      "health_timeout": 5
+    },
+    "test_data": {
+      "text_queries": [
+        "Where can I find milk?",
+        "Do you have fresh apples?",
+        "What's the price of bread?",
+        "Where is the dairy section?",
+        "Show me organic vegetables"
+      ],
+      "concurrent_requests": 5,
+      "iterations_per_mode": 10
+    },
+    "performance_thresholds": {
+      "excellent_ms": 1000,
+      "good_ms": 3000,
+      "acceptable_ms": 5000
+    },
+    "analytics": {
+      "session_id_prefix": "perf_test_",
+      "track_analytics": true
+    }
+  }
+}
